@@ -1,0 +1,49 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F7F4EE;
+  --bg-panel: #FFFFFF;
+  --bg-hover: #F0EDE6;
+  --bg-active: #E8E3D8;
+  --text-primary: #1A1712;
+  --text-secondary: #6B6459;
+  --text-muted: #A09890;
+  --border: rgba(26,23,18,0.1);
+  --border-strong: rgba(26,23,18,0.2);
+  --accent: #C17A3C;
+  --accent-light: #F5E6D3;
+  --accent-dark: #9A5E28;
+  --user-bubble: #1A1712;
+  --user-text: #F7F4EE;
+  --persona-bubble: #FFFFFF;
+  --persona-border: rgba(26,23,18,0.1);
+  --font-display: 'Lora', Georgia, serif;
+  --font-body: 'DM Sans', system-ui, sans-serif;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --sidebar-width: 280px;
+  --transition: 0.18s ease;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--text-primary);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font-family: var(--font-body); cursor: pointer; border: none; background: none; }
+input, textarea, select { font-family: var(--font-body); }
+textarea { resize: none; }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0; }
