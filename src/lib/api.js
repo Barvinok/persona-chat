@@ -7,13 +7,29 @@ const LANG_LABELS = {
 
 export function buildSystemPrompt(profile) {
   const langInstruction = LANG_LABELS[profile.language] || 'Russian'
+
   const fileSection = profile.fileContent
     ? `Here are their actual messages that define their voice:\n---\n${profile.fileContent.substring(0, 8000)}\n---`
     : 'No file uploaded — respond in a warm, personal style.'
 
+  const relationshipSection = profile.relationship
+    ? `\nRelationship: The person you are talking to is ${profile.relationship}.`
+    : ''
+
+  const extraInfoSection = profile.extraInfo
+    ? `\nExtra context about ${profile.name}:\n${profile.extraInfo}`
+    : ''
+
+  const topicsSection = profile.topics?.length
+    ? `\nPreferred conversation topics: ${profile.topics.join(', ')}. Lean into these naturally when relevant.`
+    : ''
+
   return `You are roleplaying as ${profile.name}, a real person. You have learned their communication style from their messages.
 
 ${fileSection}
+${relationshipSection}
+${extraInfoSection}
+${topicsSection}
 
 Rules:
 - Always respond as ${profile.name} would — use their vocabulary, sentence rhythm, emotional warmth, topics they care about, typical expressions
