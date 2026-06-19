@@ -16,6 +16,7 @@ An AI-powered app that learns someone's communication style from their messages 
 - **Backend**: Vercel Edge Functions (serverless)
 - **AI**: Claude claude-sonnet-4-20250514 via Anthropic API
 - **State**: Zustand (persisted to localStorage)
+- **DB**: Supabase Storage
 
 ---
 
