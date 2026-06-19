@@ -6,7 +6,7 @@ import './Sidebar.css'
 
 const LANG_SHORT = { ru: 'RU', uk: 'UK', both: 'RU+UK', en: 'EN' }
 
-export default function Sidebar() {
+export default function Sidebar({ user, onSignOut }) {
   const { profiles, activeProfileId, setActiveProfile, deleteProfile } = useStore()
   const [showModal, setShowModal] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState(null)
@@ -57,6 +57,11 @@ export default function Sidebar() {
         <button className="add-profile-btn" onClick={() => setShowModal(true)}>
           <span>+</span> New profile
         </button>
+
+        <div className="sidebar-footer">
+          <span className="sidebar-email">{user?.email}</span>
+          <button className="signout-btn" onClick={onSignOut}>Sign out</button>
+        </div>
       </aside>
 
       {showModal && <NewProfileModal onClose={() => setShowModal(false)} />}
