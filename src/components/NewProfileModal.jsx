@@ -2,6 +2,7 @@ import React, { useState, useCallback } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { useStore } from '../lib/store'
 import './NewProfileModal.css'
+import { supabase } from '../lib/supabase'
 
 const LANGUAGES = [
   { value: 'ru', label: 'Russian' },
@@ -21,6 +22,7 @@ export default function NewProfileModal({ onClose }) {
   const [language, setLanguage] = useState('ru')
   const [fileContent, setFileContent] = useState(null)
   const [fileName, setFileName] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   // Step 1 — extra info
   const [relationship, setRelationship] = useState('')
@@ -252,7 +254,9 @@ export default function NewProfileModal({ onClose }) {
           }
           {step < STEPS.length - 1
             ? <button className="btn-primary" onClick={handleNext}>Continue</button>
-            : <button className="btn-primary" onClick={handleCreate}>Create profile</button>
+            : <button className="btn-primary" onClick={handleCreate} disabled={loading}>
+  {loading ? 'Creating...' : 'Create profile'}
+</button>
           }
         </div>
       </div>
