@@ -67,22 +67,51 @@ export default function NewProfileModal({ onClose }) {
     setStep(s => s + 1)
   }
 
-  const handleCreate = () => {
-    const topics = [
-      ...selectedTopics,
-      ...(customTopic.trim() ? [customTopic.trim()] : [])
-    ]
-    addProfile({
+  const handleCreate = async () => {
+  setError(null)
+  setLoading(true)
+
+  const topics = [
+    ...selectedTopics,
+    ...(customTopic.trim() ? [customTopic.trim()] : [])
+  ]
+
+  try {
+    let fileUrl = null
+
+    if (fileContent && fileName) {
+      const { data: userData } = await supabase.auth.getUser()
+      const user = userData?.user
+      if (!user) throw new Error('Not logged in')
+
+      const filePath = `${user.id}/${Date.now()}_${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('persona-files')
+        .upload(filePath, new Blob([fileContent], { type: 'text/plain' }))
+
+      if (uploadError) throw uploadError
+
+      fileUrl = filePath
+    }
+
+    await addProfile({
       name: name.trim(),
       language,
-      fileContent,
-      fileName,
+      fileContent, // kept for immediate use this session
+      fileUrl,
       relationship: relationship.trim(),
       extraInfo: extraInfo.trim(),
       topics,
     })
+
     onClose()
+  } catch (e) {
+    setError(e.message || 'Failed to create profile.')
+  } finally {
+    setLoading(false)
   }
+}
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
