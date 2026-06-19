@@ -1,3 +1,5 @@
+import { supabase } from './supabase'
+
 const LANG_LABELS = {
   ru: 'Russian',
   uk: 'Ukrainian',
@@ -5,19 +7,35 @@ const LANG_LABELS = {
   en: 'English',
 }
 
-export function buildSystemPrompt(profile) {
+export async function getFileContent(profile) {
+  if (profile.fileContent) return profile.fileContent
+  if (!profile.file_url) return null
+
+  const { data, error } = await supabase.storage
+    .from('persona-files')
+    .download(profile.file_url)
+
+  if (error) {
+    console.error('Failed to download file:', error.message)
+    return null
+  }
+
+  return await data.text()
+}
+
+export function buildSystemPrompt(profile, fileContent) {
   const langInstruction = LANG_LABELS[profile.language] || 'Russian'
 
-  const fileSection = profile.fileContent
-    ? `Here are their actual messages that define their voice:\n---\n${profile.fileContent.substring(0, 8000)}\n---`
+  const fileSection = fileContent
+    ? `Here are their actual messages that define their voice:\n---\n${fileContent.substring(0, 8000)}\n---`
     : 'No file uploaded — respond in a warm, personal style.'
 
   const relationshipSection = profile.relationship
     ? `\nRelationship: The person you are talking to is ${profile.relationship}.`
     : ''
 
-  const extraInfoSection = profile.extraInfo
-    ? `\nExtra context about ${profile.name}:\n${profile.extraInfo}`
+  const extraInfoSection = profile.extra_info
+    ? `\nExtra context about ${profile.name}:\n${profile.extra_info}`
     : ''
 
   const topicsSection = profile.topics?.length
@@ -41,7 +59,8 @@ Rules:
 }
 
 export async function sendChatMessage(profile, messages) {
-  const systemPrompt = buildSystemPrompt(profile)
+  const fileContent = await getFileContent(profile)
+  const systemPrompt = buildSystemPrompt(profile, fileContent)
 
   const apiMessages = messages
     .filter(m => m.role === 'user' || m.role === 'assistant')
@@ -59,7 +78,6 @@ export async function sendChatMessage(profile, messages) {
   }
 
   const data = await response.json()
-
   if (data.error) throw new Error(data.error.message || 'API error')
 
   return data.content?.map(c => c.text || '').join('') || ''
