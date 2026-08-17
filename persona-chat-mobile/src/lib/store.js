@@ -81,66 +81,26 @@ export const useStore = create((set, get) => ({
     return data.id
   },
 
-  // Persists any editable profile field to the DB, not just language.
-  // Pass `topics` as an array — it's converted to the comma-separated
-  // string the `topics` column expects.
   updateProfile: async (id, updates) => {
     set(s => ({
       profiles: s.profiles.map(p => p.id === id ? { ...p, ...updates } : p)
     }))
 
     const dbUpdates = {}
-    if (updates.name !== undefined) dbUpdates.name = updates.name
-    if (updates.language !== undefined) dbUpdates.language = updates.language
-    if (updates.relationship !== undefined) dbUpdates.relationship = updates.relationship
-    if (updates.extra_info !== undefined) dbUpdates.extra_info = updates.extra_info
-    if (updates.topics !== undefined) {
-      dbUpdates.topics = Array.isArray(updates.topics)
-        ? updates.topics.join(',')
-        : updates.topics
-    }
-
+    if (updates.language) dbUpdates.language = updates.language
     if (Object.keys(dbUpdates).length > 0) {
-      const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', id)
-      if (error) console.error('Failed to update profile:', error.message)
+      await supabase.from('profiles').update(dbUpdates).eq('id', id)
     }
   },
 
-  // Deletes a profile, its uploaded source file in storage, and (via the
-  // messages_profile_id_fkey ON DELETE CASCADE migration) its messages.
   deleteProfile: async (id) => {
-    const profile = get().profiles.find(p => p.id === id)
-
-    if (profile?.file_url) {
-      const { error: storageError } = await supabase.storage
-        .from('persona-files')
-        .remove([profile.file_url])
-      if (storageError) {
-        // Don't block the profile delete on a storage cleanup failure —
-        // just log it so it can be cleaned up manually if needed.
-        console.error('Failed to remove profile file from storage:', storageError.message)
-      }
-    }
-
-    const { error } = await supabase.from('profiles').delete().eq('id', id)
-    if (error) {
-      console.error('Failed to delete profile:', error.message)
-      return
-    }
-
+    await supabase.from('profiles').delete().eq('id', id)
     set(s => ({
       profiles: s.profiles.filter(p => p.id !== id),
       activeProfileId: s.activeProfileId === id
         ? (s.profiles.find(p => p.id !== id)?.id || null)
         : s.activeProfileId
     }))
-  },
-
-  // Bulk delete helper for the Manage Profiles admin view.
-  deleteProfiles: async (ids) => {
-    for (const id of ids) {
-      await get().deleteProfile(id)
-    }
   },
 
   setActiveProfile: (id) => set({ activeProfileId: id }),

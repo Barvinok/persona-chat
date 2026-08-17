@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useStore } from '../lib/store'
 import Avatar from './Avatar'
 import NewProfileModal from './NewProfileModal'
+import ManageProfilesModal from './ManageProfilesModal'
 import './Sidebar.css'
 
 const LANG_SHORT = { ru: 'RU', uk: 'UK', both: 'RU+UK', en: 'EN' }
@@ -9,6 +10,7 @@ const LANG_SHORT = { ru: 'RU', uk: 'UK', both: 'RU+UK', en: 'EN' }
 export default function Sidebar({ user, onSignOut }) {
   const { profiles, activeProfileId, setActiveProfile, deleteProfile } = useStore()
   const [showModal, setShowModal] = useState(false)
+  const [showManageModal, setShowManageModal] = useState(false)
   const [menuOpenId, setMenuOpenId] = useState(null)
 
   return (
@@ -58,6 +60,10 @@ export default function Sidebar({ user, onSignOut }) {
           <span>+</span> New profile
         </button>
 
+        <button className="manage-profiles-btn" onClick={() => setShowManageModal(true)}>
+          Manage profiles
+        </button>
+
         <div className="sidebar-footer">
           <span className="sidebar-email">{user?.email}</span>
           <button className="signout-btn" onClick={onSignOut}>Sign out</button>
@@ -65,6 +71,7 @@ export default function Sidebar({ user, onSignOut }) {
       </aside>
 
       {showModal && <NewProfileModal onClose={() => setShowModal(false)} />}
+      {showManageModal && <ManageProfilesModal onClose={() => setShowManageModal(false)} />}
     </>
   )
 }
