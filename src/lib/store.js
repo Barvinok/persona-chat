@@ -8,42 +8,48 @@ export const useStore = create((set, get) => ({
 
   // Load all profiles + their messages for the logged-in user
   loadProfiles: async () => {
-    set({ loading: true })
-    const { data: profiles, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true })
+  set({ loading: true })
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: true })
+  if (error) {
+    console.error('Failed to load profiles:', error.message)
+    set({ loading: false })
+    return
+  }
+  const profilesWithData = await Promise.all(
+    profiles.map(async (p) => {
+      const { data: messages } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('profile_id', p.id)
+        .order('created_at', { ascending: true })
+      const { data: facts } = await supabase
+        .from('profile_facts')
+        .select('*')
+        .eq('profile_id', p.id)
+        .order('created_at', { ascending: true })
+      return {
+        ...p,
+        color: colorForIndex(profiles.indexOf(p)),
+        topics: p.topics ? p.topics.split(',') : [],
+        messages: (messages || []).map(m => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+        })),
+        facts: (facts || []).map(f => ({
+          id: f.id,
+          person_name: f.person_name,
+          fact: f.fact,
+        })),
+      }
+    })
+  )
+  set({ profiles: profilesWithData, loading: false })
+},
 
-    if (error) {
-      console.error('Failed to load profiles:', error.message)
-      set({ loading: false })
-      return
-    }
-
-    // Load messages for each profile
-    const profilesWithMessages = await Promise.all(
-      profiles.map(async (p) => {
-        const { data: messages } = await supabase
-          .from('messages')
-          .select('*')
-          .eq('profile_id', p.id)
-          .order('created_at', { ascending: true })
-
-        return {
-          ...p,
-          color: colorForIndex(profiles.indexOf(p)),
-          topics: p.topics ? p.topics.split(',') : [],
-          messages: (messages || []).map(m => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-          })),
-        }
-      })
-    )
-
-    set({ profiles: profilesWithMessages, loading: false })
-  },
 
   addProfile: async (profile) => {
     const { data: userData } = await supabase.auth.getUser()
@@ -175,6 +181,16 @@ export const useStore = create((set, get) => ({
           : p
       )
     }))
+  },
+
+  addFacts: (profileId, newFacts) => {
+    set(s => ({
+      profiles: s.profiles.map(p =>
+       p.id === profileId
+          ? { ...p, facts: [...(p.facts || []), ...newFacts.map(f => ({ id: f.id, person_name: f.person_name, fact: f.fact }))] }
+          : p
+      )
+   }))
   },
 
   clearMessages: async (profileId) => {

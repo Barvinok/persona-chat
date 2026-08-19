@@ -1,3 +1,4 @@
+import { sendChatMessage, extractFacts } from '../lib/api'
 import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../lib/store'
 import { sendChatMessage } from '../lib/api'
@@ -52,12 +53,19 @@ export default function ChatWindow() {
         ...updatedProfile.messages.filter(m => m.role === 'user' || m.role === 'assistant'),
       ]
       const reply = await sendChatMessage(updatedProfile, allMessages)
-      addMessage(profile.id, { role: 'assistant', content: reply })
+      await addMessage(profile.id, { role: 'assistant', content: reply })
+
+     // Fire-and-forget: extract facts in the background, don't block the UI
+      const latestProfile = useStore.getState().profiles.find(p => p.id === profile.id)
+      extractFacts(latestProfile, text, reply).then(newFacts => {
+        if (newFacts.length) useStore.getState().addFacts(profile.id, newFacts)
+      })
     } catch (e) {
-      setError(e.message || 'Something went wrong. Check your API key in Vercel settings.')
+       setError(e.message || 'Something went wrong. Check your API key in Vercel settings.')
     } finally {
       setIsTyping(false)
     }
+
   }
 
   const handleKeyDown = (e) => {
