@@ -1,7 +1,6 @@
 import { sendChatMessage, extractFacts } from '../lib/api'
 import React, { useState, useRef, useEffect } from 'react'
 import { useStore } from '../lib/store'
-import { sendChatMessage } from '../lib/api'
 import Avatar from './Avatar'
 import './ChatWindow.css'
 
