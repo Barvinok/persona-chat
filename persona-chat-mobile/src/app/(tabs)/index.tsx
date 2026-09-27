@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react'
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
 import { router } from 'expo-router'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 export default function Chat() {
   const [checking, setChecking] = useState(true)
