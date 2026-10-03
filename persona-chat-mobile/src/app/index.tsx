@@ -9,11 +9,13 @@ export default function Index() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Root index: getSession on mount ->', session ? 'has session' : 'no session')
       setSession(session)
       setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Root index: onAuthStateChange ->', _event, session ? 'has session' : 'no session')
       setSession(session)
     })
 
@@ -27,8 +29,7 @@ export default function Index() {
       </View>
     )
   }
-
-  return session ? <Redirect href="/(tabs)" /> : <Redirect href="/login" />
+  return session ? <Redirect href="/(tabs)/home" /> : <Redirect href="/login" />
 }
 
 const styles = StyleSheet.create({

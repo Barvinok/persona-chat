@@ -1,180 +1,299 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+// src/app/(tabs)/explore.tsx
+import React, { useEffect, useState } from 'react'
+import {
+  View, Text, TextInput, Pressable, FlatList, StyleSheet, Alert, ActivityIndicator,
+} from 'react-native'
+import { router } from 'expo-router'
+import { useStore } from '../../lib/store'
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+const LANGUAGES = [
+  { value: 'ru', label: 'Russian' },
+  { value: 'uk', label: 'Ukrainian' },
+  { value: 'both', label: 'Ru + Uk' },
+  { value: 'en', label: 'English' },
+]
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+function formatDate(dateStr) {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+}
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
-    },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
-    },
-  });
+export default function Explore() {
+  const { profiles, loading, loadProfiles, updateProfile, deleteProfile, deleteProfiles } = useStore()
+
+  const [selected, setSelected] = useState(new Set())
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+
+  useEffect(() => {
+    loadProfiles()
+  }, [])
+
+  const filtered = profiles.filter(p =>
+    p.name.toLowerCase().includes(query.toLowerCase())
+  )
+
+  const toggleSelected = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const startEdit = (profile) => {
+    setEditingId(profile.id)
+    setEditForm({
+      name: profile.name || '',
+      language: profile.language || 'ru',
+      relationship: profile.relationship || '',
+      extra_info: profile.extra_info || '',
+      topics: (profile.topics || []).join(', '),
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditingId(null)
+    setEditForm(null)
+  }
+
+  const saveEdit = async (id) => {
+    if (!editForm) return
+    setBusy(true)
+    await updateProfile(id, {
+      name: editForm.name.trim(),
+      language: editForm.language,
+      relationship: editForm.relationship.trim(),
+      extra_info: editForm.extra_info.trim(),
+      topics: editForm.topics.split(',').map(t => t.trim()).filter(Boolean),
+    })
+    setBusy(false)
+    cancelEdit()
+  }
+
+  const handleDeleteOne = (id, name) => {
+    Alert.alert(
+      `Delete ${name}?`,
+      'This also removes their chat history and uploaded file.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            setBusy(true)
+            await deleteProfile(id)
+            setSelected(prev => {
+              const next = new Set(prev)
+              next.delete(id)
+              return next
+            })
+            setBusy(false)
+          }
+        },
+      ]
+    )
+  }
+
+  const handleDeleteSelected = () => {
+    const count = selected.size
+    if (!count) return
+    Alert.alert(
+      `Delete ${count} profile${count > 1 ? 's' : ''}?`,
+      'This also removes their chat history and uploaded files.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive', onPress: async () => {
+            setBusy(true)
+            await deleteProfiles([...selected])
+            setSelected(new Set())
+            setBusy(false)
+          }
+        },
+      ]
+    )
+  }
+
+  if (loading) {
+    return <View style={styles.centered}><ActivityIndicator size="large" /></View>
+  }
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <View style={styles.page}>
+      <View style={styles.toolbar}>
+        <TextInput
+          style={styles.search}
+          placeholder="Search profiles..."
+          placeholderTextColor="#999"
+          value={query}
+          onChangeText={setQuery}
+        />
+        <Pressable style={styles.addButton} onPress={() => router.push('/new-profile')}>
+          <Text style={styles.addButtonText}>+</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.dangerButton, selected.size === 0 && styles.buttonDisabled]}
+          onPress={handleDeleteSelected}
+          disabled={selected.size === 0 || busy}
+        >
+          <Text style={styles.dangerButtonText}>
+            Delete {selected.size > 0 ? `(${selected.size})` : ''}
+          </Text>
+        </Pressable>
+      </View>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
+      <FlatList
+        data={filtered}
+        keyExtractor={item => item.id}
+        ListEmptyComponent={<Text style={styles.empty}>No profiles match.</Text>}
+        renderItem={({ item: profile }) => (
+          <View style={styles.row}>
+            <View style={styles.rowMain}>
+              <Pressable onPress={() => toggleSelected(profile.id)} style={styles.checkbox}>
+                <View style={[styles.checkboxBox, selected.has(profile.id) && styles.checkboxChecked]} />
+              </Pressable>
+              <View style={[styles.avatar, { backgroundColor: profile.color?.bg || '#eee' }]}>
+                <Text style={[styles.avatarText, { color: profile.color?.text || '#333' }]}>
+                  {profile.name?.[0]?.toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowName}>{profile.name}</Text>
+                <Text style={styles.rowMeta}>
+                  {LANGUAGES.find(l => l.value === profile.language)?.label || profile.language}
+                  {' · '}{profile.messages?.length ?? 0} msgs
+                  {' · '}{formatDate(profile.created_at)}
+                </Text>
+              </View>
+              <Pressable
+                style={styles.smallButton}
+                onPress={() => editingId === profile.id ? cancelEdit() : startEdit(profile)}
+              >
+                <Text style={styles.smallButtonText}>{editingId === profile.id ? 'Cancel' : 'Edit'}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.smallDangerButton}
+                onPress={() => handleDeleteOne(profile.id, profile.name)}
+                disabled={busy}
+              >
+                <Text style={styles.smallDangerButtonText}>Delete</Text>
+              </Pressable>
+            </View>
+
+            {editingId === profile.id && editForm && (
+              <View style={styles.editPanel}>
+                <Text style={styles.fieldLabel}>Name</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editForm.name}
+                  onChangeText={t => setEditForm(f => f ? { ...f, name: t } : f)}
                 />
-              </ThemedView>
-            </Pressable>
-          </ExternalLink>
-        </ThemedView>
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+                <Text style={styles.fieldLabel}>Response language</Text>
+                <View style={styles.chipRow}>
+                  {LANGUAGES.map(l => (
+                    <Pressable
+                      key={l.value}
+                      style={[styles.chip, editForm.language === l.value && styles.chipActive]}
+                      onPress={() => setEditForm(f => f ? { ...f, language: l.value } : f)}
+                    >
+                      <Text style={[styles.chipText, editForm.language === l.value && styles.chipTextActive]}>
+                        {l.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
 
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
+                <Text style={styles.fieldLabel}>Relationship</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editForm.relationship}
+                  onChangeText={t => setEditForm(f => f ? { ...f, relationship: t } : f)}
+                />
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+                <Text style={styles.fieldLabel}>Extra context</Text>
+                <TextInput
+                  style={[styles.fieldInput, styles.textArea]}
+                  multiline
+                  numberOfLines={3}
+                  value={editForm.extra_info}
+                  onChangeText={t => setEditForm(f => f ? { ...f, extra_info: t } : f)}
+                />
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+                <Text style={styles.fieldLabel}>Topics (comma-separated)</Text>
+                <TextInput
+                  style={styles.fieldInput}
+                  value={editForm.topics}
+                  onChangeText={t => setEditForm(f => f ? { ...f, topics: t } : f)}
+                />
 
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
-  );
+                <View style={styles.editActions}>
+                  <Pressable style={styles.smallButton} onPress={cancelEdit}>
+                    <Text style={styles.smallButtonText}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.primaryButton, (busy || !editForm.name.trim()) && styles.buttonDisabled]}
+                    onPress={() => saveEdit(profile.id)}
+                    disabled={busy || !editForm.name.trim()}
+                  >
+                    <Text style={styles.primaryButtonText}>{busy ? 'Saving...' : 'Save'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+          </View>
+        )}
+      />
+    </View>
+  )
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  page: { flex: 1, backgroundColor: '#F5F6FA', padding: 16 },
+  toolbar: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  search: {
+    flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#DDD',
+    borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15,
   },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+  addButton: {
+    backgroundColor: '#208AEF', borderRadius: 10, width: 44,
+    justifyContent: 'center', alignItems: 'center',
   },
-  container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+  addButtonText: { color: '#fff', fontSize: 22, fontWeight: '700', lineHeight: 24 },
+  dangerButton: { backgroundColor: '#D33', borderRadius: 10, paddingHorizontal: 14, justifyContent: 'center' },
+  dangerButtonText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  buttonDisabled: { opacity: 0.5 },
+  empty: { textAlign: 'center', color: '#999', marginTop: 40 },
+  row: { backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 10 },
+  rowMain: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  checkbox: { padding: 4 },
+  checkboxBox: { width: 20, height: 20, borderWidth: 1.5, borderColor: '#CCC', borderRadius: 5 },
+  checkboxChecked: { backgroundColor: '#208AEF', borderColor: '#208AEF' },
+  avatar: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+  avatarText: { fontWeight: '700', fontSize: 14 },
+  rowInfo: { flex: 1 },
+  rowName: { fontWeight: '600', fontSize: 15 },
+  rowMeta: { fontSize: 12, color: '#888', marginTop: 2 },
+  smallButton: { backgroundColor: '#F0F0F3', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  smallButtonText: { fontSize: 12, fontWeight: '600', color: '#333' },
+  smallDangerButton: { backgroundColor: '#FDEAEA', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  smallDangerButtonText: { fontSize: 12, fontWeight: '600', color: '#D33' },
+  editPanel: { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#EEE', gap: 4 },
+  fieldLabel: { fontSize: 12, fontWeight: '600', color: '#666', marginTop: 8, marginBottom: 4 },
+  fieldInput: {
+    borderWidth: 1, borderColor: '#DDD', borderRadius: 8,
+    paddingHorizontal: 12, paddingVertical: 8, fontSize: 14,
   },
-  titleContainer: {
-    gap: Spacing.three,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
-  },
-  centerText: {
-    textAlign: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
-    justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
-  },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
-  },
-  collapsibleContent: {
-    alignItems: 'center',
-  },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
-  },
-});
+  textArea: { textAlignVertical: 'top' },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  chip: { backgroundColor: '#F0F0F3', borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  chipActive: { backgroundColor: '#208AEF' },
+  chipText: { fontSize: 12, color: '#666', fontWeight: '600' },
+  chipTextActive: { color: '#fff' },
+  editActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 12 },
+  primaryButton: { backgroundColor: '#208AEF', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  primaryButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+})

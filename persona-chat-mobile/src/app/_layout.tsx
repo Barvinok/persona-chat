@@ -13,6 +13,7 @@ export default function RootLayout() {
         <Stack.Screen name="index" />
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
+	<Stack.Screen name="new-profile" options={{ presentation: 'modal', headerShown: true, title: 'New Profile' }} />
       </Stack>
     </ThemeProvider>
   );

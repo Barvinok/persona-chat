@@ -1,10 +1,10 @@
-// src/app/chat.tsx
+// src/app/(tabs)/index.tsx
 import React, { useEffect, useState } from 'react'
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 
-export default function Chat() {
+export default function ChatHome() {
   const [checking, setChecking] = useState(true)
   const [email, setEmail] = useState(null)
 
@@ -17,17 +17,22 @@ export default function Chat() {
         setChecking(false)
       }
     })
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session) router.replace('/')
-    })
-
-    return () => listener.subscription.unsubscribe()
   }, [])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    console.log('Sign out tapped')
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('signOut timed out')), 5000)),
+      ])
+      console.log('signOut completed')
+    } catch (err) {
+      console.log('signOut error/timeout:', err.message)
+    }
+    console.log('About to call router.replace')
     router.replace('/')
+    console.log('router.replace called')
   }
 
   if (checking) {

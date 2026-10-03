@@ -6,29 +6,29 @@ export const useStore = create((set, get) => ({
   activeProfileId: null,
   loading: false,
 
-  // Load all profiles + their messages for the logged-in user
   loadProfiles: async () => {
     set({ loading: true })
     const { data: profiles, error } = await supabase
       .from('profiles')
       .select('*')
       .order('created_at', { ascending: true })
-
     if (error) {
       console.error('Failed to load profiles:', error.message)
       set({ loading: false })
       return
     }
-
-    // Load messages for each profile
-    const profilesWithMessages = await Promise.all(
+    const profilesWithData = await Promise.all(
       profiles.map(async (p) => {
         const { data: messages } = await supabase
           .from('messages')
           .select('*')
           .eq('profile_id', p.id)
           .order('created_at', { ascending: true })
-
+        const { data: facts } = await supabase
+          .from('profile_facts')
+          .select('*')
+          .eq('profile_id', p.id)
+          .order('created_at', { ascending: true })
         return {
           ...p,
           color: colorForIndex(profiles.indexOf(p)),
@@ -38,11 +38,15 @@ export const useStore = create((set, get) => ({
             role: m.role,
             content: m.content,
           })),
+          facts: (facts || []).map(f => ({
+            id: f.id,
+            person_name: f.person_name,
+            fact: f.fact,
+          })),
         }
       })
     )
-
-    set({ profiles: profilesWithMessages, loading: false })
+    set({ profiles: profilesWithData, loading: false })
   },
 
   addProfile: async (profile) => {
@@ -73,7 +77,7 @@ export const useStore = create((set, get) => ({
       ...data,
       color: colorForIndex(get().profiles.length),
       topics: profile.topics || [],
-      fileContent: profile.fileContent || null, // kept in memory only for this session
+      fileContent: profile.fileContent || null,
       messages: [],
     }
 
@@ -87,14 +91,40 @@ export const useStore = create((set, get) => ({
     }))
 
     const dbUpdates = {}
-    if (updates.language) dbUpdates.language = updates.language
+    if (updates.name !== undefined) dbUpdates.name = updates.name
+    if (updates.language !== undefined) dbUpdates.language = updates.language
+    if (updates.relationship !== undefined) dbUpdates.relationship = updates.relationship
+    if (updates.extra_info !== undefined) dbUpdates.extra_info = updates.extra_info
+    if (updates.topics !== undefined) {
+      dbUpdates.topics = Array.isArray(updates.topics)
+        ? updates.topics.join(',')
+        : updates.topics
+    }
+
     if (Object.keys(dbUpdates).length > 0) {
-      await supabase.from('profiles').update(dbUpdates).eq('id', id)
+      const { error } = await supabase.from('profiles').update(dbUpdates).eq('id', id)
+      if (error) console.error('Failed to update profile:', error.message)
     }
   },
 
   deleteProfile: async (id) => {
-    await supabase.from('profiles').delete().eq('id', id)
+    const profile = get().profiles.find(p => p.id === id)
+
+    if (profile?.file_url) {
+      const { error: storageError } = await supabase.storage
+        .from('persona-files')
+        .remove([profile.file_url])
+      if (storageError) {
+        console.error('Failed to remove profile file from storage:', storageError.message)
+      }
+    }
+
+    const { error } = await supabase.from('profiles').delete().eq('id', id)
+    if (error) {
+      console.error('Failed to delete profile:', error.message)
+      return
+    }
+
     set(s => ({
       profiles: s.profiles.filter(p => p.id !== id),
       activeProfileId: s.activeProfileId === id
@@ -103,10 +133,15 @@ export const useStore = create((set, get) => ({
     }))
   },
 
+  deleteProfiles: async (ids) => {
+    for (const id of ids) {
+      await get().deleteProfile(id)
+    }
+  },
+
   setActiveProfile: (id) => set({ activeProfileId: id }),
 
   addMessage: async (profileId, message) => {
-    // Optimistic UI update first
     const tempId = Date.now().toString()
     set(s => ({
       profiles: s.profiles.map(p =>
@@ -127,11 +162,20 @@ export const useStore = create((set, get) => ({
       return
     }
 
-    // Replace temp message with real DB row (real id)
     set(s => ({
       profiles: s.profiles.map(p =>
         p.id === profileId
           ? { ...p, messages: p.messages.map(m => m.id === tempId ? { ...m, id: data.id } : m) }
+          : p
+      )
+    }))
+  },
+
+  addFacts: (profileId, newFacts) => {
+    set(s => ({
+      profiles: s.profiles.map(p =>
+        p.id === profileId
+          ? { ...p, facts: [...(p.facts || []), ...newFacts.map(f => ({ id: f.id, person_name: f.person_name, fact: f.fact }))] }
           : p
       )
     }))
